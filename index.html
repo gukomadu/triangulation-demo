@@ -1,0 +1,1222 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Triangulation — Build Your Map</title>
+<style>
+  :root{
+    --paper:#faf7f1; --card:#fffdf9; --ink:#2b2620; --muted:#7a7166;
+    --line:#e4dccb; --accent:#476b5c; --accent-soft:#e9f0ea;
+    --amber-bg:#fbf3e2; --amber-line:#e6d3a3; --amber-ink:#7a5b23;
+    --radius:12px;
+    /* piece type colors */
+    --c-agent:#a4552f; --c-real:#476b5c; --c-feeling:#3f6d9e;
+    --c-rule:#7a5ba6; --c-claim:#b07a2a; --c-memory:#2a8a8a; --c-drain:#6b6b6b;
+  }
+  *{box-sizing:border-box}
+  body{
+    margin:0; background:var(--paper); color:var(--ink);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    line-height:1.65; font-size:16px;
+  }
+  .wrap{max-width:860px; margin:0 auto; padding:24px 20px 60px}
+  header.site{margin:8px 0 4px}
+  header.site h1{
+    font-family:Georgia,"Times New Roman",serif; font-weight:600;
+    font-size:2rem; margin:0 0 2px; letter-spacing:.2px;
+  }
+  header.site .tagline{color:var(--muted); margin:0 0 14px; font-size:1.02rem}
+  .demo-banner{
+    background:var(--amber-bg); border:1px solid var(--amber-line); color:var(--amber-ink);
+    border-radius:var(--radius); padding:12px 16px; margin:12px 0 18px; font-size:.94rem;
+    display:flex; gap:12px; align-items:center; justify-content:space-between; flex-wrap:wrap;
+  }
+  nav.tabs{display:flex; gap:8px; flex-wrap:wrap; margin:6px 0 22px}
+  nav.tabs button{
+    border:1px solid var(--line); background:var(--card); color:var(--ink);
+    padding:10px 18px; border-radius:999px; font-size:.95rem; cursor:pointer;
+  }
+  nav.tabs button.active{background:var(--accent); border-color:var(--accent); color:#fff}
+  nav.tabs button:hover:not(.active){border-color:var(--accent)}
+  .card{
+    background:var(--card); border:1px solid var(--line); border-radius:var(--radius);
+    padding:22px 24px; margin:0 0 16px;
+  }
+  .card h2{font-family:Georgia,serif; font-size:1.35rem; margin:0 0 10px; font-weight:600}
+  .card h3{font-size:1.05rem; margin:16px 0 6px}
+  .muted{color:var(--muted)} .small{font-size:.88rem}
+  .lede{font-size:1.03rem; max-width:62ch}
+  .progress{
+    color:var(--muted); font-size:.95rem; margin:0 0 12px;
+    display:flex; justify-content:space-between; align-items:baseline; flex-wrap:wrap; gap:6px;
+  }
+  .progress .bar{height:6px; background:var(--line); border-radius:3px; overflow:hidden; margin-top:8px; flex-basis:100%}
+  .progress .bar i{display:block; height:100%; background:var(--accent); border-radius:3px; transition:width .3s}
+  .howto{
+    background:var(--accent-soft); border-radius:8px; padding:10px 14px;
+    font-size:.92rem; margin:0 0 14px; color:var(--ink);
+  }
+  /* ---- piece tray ---- */
+  .tray-types{display:grid; gap:8px; margin:12px 0}
+  .ptype{
+    display:flex; align-items:center; gap:12px; background:#fff;
+    border:1px solid var(--line); border-radius:10px; padding:10px 12px;
+  }
+  .ptype .dot{width:14px; height:14px; border-radius:50%; flex:none}
+  .ptype .tname{font-weight:700; font-size:.95rem}
+  .ptype .tdesc{color:var(--muted); font-size:.85rem; flex:1}
+  .ptype button.add{
+    flex:none; width:44px; height:44px; border-radius:50%;
+    border:2px solid var(--line); background:var(--card); color:var(--ink);
+    font-size:1.5rem; line-height:1; cursor:pointer;
+  }
+  .ptype button.add:hover{border-color:var(--accent); color:var(--accent)}
+  .tray-pieces{display:flex; flex-wrap:wrap; gap:8px; margin:10px 0; min-height:44px}
+  .tray-hint{color:var(--muted); font-size:.88rem; font-style:italic}
+  /* ---- board ---- */
+  .board-wrap{
+    position:relative; width:100%; aspect-ratio:1000/880;
+    margin:8px 0 6px; touch-action:none; border-radius:var(--radius);
+    background:#fff; border:1px solid var(--line); overflow:hidden;
+  }
+  .board-wrap svg.board{position:absolute; inset:0; width:100%; height:100%}
+  .chip{
+    position:absolute; transform:translate(-50%,-50%);
+    background:#fffdf9; border:1px solid var(--line); border-left:6px solid #999;
+    border-radius:8px; padding:6px 10px; font-size:.88rem; font-weight:600;
+    cursor:grab; user-select:none; -webkit-user-select:none;
+    max-width:38%; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+    box-shadow:0 1px 4px rgba(43,38,32,.12);
+    touch-action:none;
+  }
+  .chip:active{cursor:grabbing}
+  .chip.dragging{box-shadow:0 6px 18px rgba(43,38,32,.25); z-index:30; opacity:.95}
+  .chip.selected{outline:3px solid var(--accent); outline-offset:2px}
+  .chip.linkpick{outline:3px dashed var(--accent); outline-offset:2px}
+  .chip.traychip{position:static; transform:none; cursor:pointer; max-width:none}
+  .chip .cdot{display:inline-block; width:9px; height:9px; border-radius:50%; margin-right:7px}
+  .t-agent{border-left-color:var(--c-agent)} .t-real{border-left-color:var(--c-real)}
+  .t-feeling{border-left-color:var(--c-feeling)} .t-rule{border-left-color:var(--c-rule)}
+  .t-claim{border-left-color:var(--c-claim)} .t-memory{border-left-color:var(--c-memory)}
+  .t-drain{border-left-color:var(--c-drain)}
+  .d-agent{background:var(--c-agent)} .d-real{background:var(--c-real)}
+  .d-feeling{background:var(--c-feeling)} .d-rule{background:var(--c-rule)}
+  .d-claim{background:var(--c-claim)} .d-memory{background:var(--c-memory)}
+  .d-drain{background:var(--c-drain)}
+  .linkvis{stroke:#8a8175; stroke-width:2.5; opacity:.75}
+  .linkhit{stroke:rgba(0,0,0,0); stroke-width:22; cursor:pointer; pointer-events:stroke}
+  .linklbl{font-size:13px; fill:#6f6555; font-style:italic; pointer-events:none}
+  /* ---- editor sheet ---- */
+  .sheet{
+    position:fixed; left:0; right:0; bottom:0; z-index:50;
+    background:var(--card); border-top:2px solid var(--line);
+    padding:18px 20px 26px; box-shadow:0 -8px 30px rgba(43,38,32,.18);
+    max-height:80vh; overflow-y:auto;
+  }
+  .sheet h3{margin:0 0 4px; font-family:Georgia,serif; font-size:1.2rem}
+  .sheet .stype{font-size:.82rem; text-transform:uppercase; letter-spacing:.6px; color:var(--muted); margin:0 0 10px}
+  .sheet label{display:block; font-weight:600; font-size:.92rem; margin:12px 0 6px}
+  .sheet input[type=text], .sheet textarea{
+    width:100%; padding:12px 14px; border:1px solid var(--line); border-radius:8px;
+    font-size:1rem; font-family:inherit; background:#fff; color:var(--ink);
+  }
+  .sheet input[type=text]:focus, .sheet textarea:focus{outline:none; border-color:var(--accent)}
+  .sheet textarea{min-height:80px; resize:vertical}
+  .navrow{display:flex; gap:10px; margin-top:18px; flex-wrap:wrap}
+  .btn{
+    display:inline-block; border:1px solid var(--accent); background:var(--accent); color:#fff;
+    padding:12px 22px; border-radius:999px; font-size:1rem; cursor:pointer;
+  }
+  .btn.secondary{background:transparent; color:var(--accent)}
+  .btn.quiet{background:transparent; color:var(--muted); border-color:var(--line)}
+  .btn.danger{background:transparent; color:#a4552f; border-color:#a4552f}
+  .btn.small{padding:7px 14px; font-size:.88rem}
+  .btn[aria-pressed="true"]{background:var(--accent); color:#fff}
+  .place-hint{
+    background:var(--amber-bg); border:1px solid var(--amber-line); color:var(--amber-ink);
+    border-radius:8px; padding:10px 14px; margin:10px 0; font-size:.92rem; display:none;
+  }
+  .place-hint.on{display:block}
+  /* ---- insights ---- */
+  .insight{
+    border-left:4px solid var(--accent); background:#fff;
+    border-radius:0 10px 10px 0; padding:14px 18px; margin:0 0 12px;
+    border-top:1px solid var(--line); border-right:1px solid var(--line); border-bottom:1px solid var(--line);
+  }
+  .insight .it{font-weight:700; margin:0 0 4px; font-size:1rem}
+  .insight p{margin:0; font-size:.95rem}
+  .insight .prov{font-size:.82rem; color:var(--muted); margin-top:6px}
+  .disclaimer{
+    border:1px dashed var(--line); border-radius:10px; padding:12px 16px;
+    font-size:.9rem; color:var(--muted); margin:16px 0;
+  }
+  .tally{display:flex; gap:12px; flex-wrap:wrap; margin:12px 0}
+  .tally .pill{background:var(--accent-soft); border-radius:8px; padding:10px 16px; font-size:.9rem}
+  .tally .pill b{font-size:1.3rem; display:block}
+  .resitem{border-top:1px solid var(--line); padding:10px 0}
+  .resitem .t{font-weight:700}
+  .resitem .note{
+    background:var(--accent-soft); border-radius:8px; padding:8px 12px; margin:8px 0 2px;
+    font-size:.94rem;
+  }
+  textarea.big{
+    width:100%; min-height:24vh; font-size:1.1rem; line-height:1.7; padding:16px;
+    border:2px solid var(--line); border-radius:var(--radius); font-family:inherit;
+    background:#fff; color:var(--ink); resize:vertical;
+  }
+  textarea.big:focus{outline:none; border-color:var(--accent)}
+  footer.safety{
+    margin-top:34px; border-top:1px solid var(--line); padding-top:18px;
+    font-size:.9rem; color:var(--muted);
+  }
+  footer.safety strong{color:var(--ink)}
+  .empty{color:var(--muted); font-style:italic; padding:10px 0}
+  details.note{margin-top:14px}
+  details.note summary{cursor:pointer; color:var(--accent); font-weight:600}
+  /* ---- the two doors ---- */
+  .doors{display:grid; grid-template-columns:1fr 1fr; gap:14px; margin:0 0 16px}
+  @media (max-width:640px){ .doors{grid-template-columns:1fr} }
+  .door{
+    display:block; text-align:left; background:var(--card); border:2px solid var(--line);
+    border-radius:var(--radius); padding:26px 24px; cursor:pointer; color:var(--ink);
+    font-family:inherit; min-height:170px;
+  }
+  .door:hover{border-color:var(--accent)}
+  .door .door-t{display:block; font-family:Georgia,serif; font-size:1.5rem; font-weight:600; margin-bottom:8px}
+  .door .door-d{display:block; color:var(--muted); font-size:.98rem; line-height:1.6}
+  /* ---- storm mode: the quietest screen ---- */
+  .storm{max-width:640px; margin:24px auto}
+  .stormbox{min-height:30vh; font-size:1.15rem}
+  .stormcatch{font-size:1.15rem; padding:16px 40px}
+  #stormHint{display:none; color:var(--muted); font-style:italic; margin-top:8px}
+  /* ---- caught fragments: the unprocessed tray ---- */
+  .frag{border-top:1px solid var(--line); padding:12px 0}
+  .frag:first-of-type{border-top:none}
+  .frag-t{font-size:1rem}
+  .frag-meta{margin-top:2px}
+  @media print{
+    nav.tabs, .navrow, footer.safety .btn, .demo-banner .btn, .noprint,
+    .tray-types, .place-hint, .sheet, .doors{display:none !important}
+    body{background:#fff}
+    .card{break-inside:avoid}
+    .board-wrap{break-inside:avoid}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="site">
+    <h1>Triangulation</h1>
+    <p class="tagline">Build your map — piece by piece. No questions, just a puzzle.</p>
+    <p class="noprint" style="margin:0 0 6px"><button class="btn quiet small" id="stormBtn">Storm mode — just get it down</button></p>
+  </header>
+
+  <div id="demoBanner"></div>
+
+  <nav class="tabs" id="tabs"></nav>
+  <main id="view"></main>
+  <div id="sheetHost"></div>
+
+  <footer class="safety">
+    <p><strong>A note on safety.</strong> This is a research instrument, not medical advice. If voices ever tell you to harm yourself or someone else, don't try to manage that alone — contact your clinician or a crisis service right away. In the US: call or text <strong>988</strong>.</p>
+    <p class="small">Everything you enter stays in this browser, on this device. Nothing is sent anywhere. You can stop at any point and keep what you've done.</p>
+    <p class="noprint"><button class="btn danger small" id="eraseAll">Erase my map and start over</button></p>
+  </footer>
+</div>
+<script>
+"use strict";
+/* ============================================================
+   Triangulation: Build Your Map — research instrument, v2
+   Method: not a questionnaire. The person names the pieces of
+   their experience, places them on the triangle, draws the lines
+   between them — and the map reflects back what it sees.
+   Plain language, no medicalized terms, nothing required, no timers,
+   no accounts. Everything in localStorage on this device.
+   ============================================================ */
+var STORE_KEY = "triangulation_map_v2";
+
+/* The seven piece types. Plain-language names and descriptions.
+   No medicalized terminology anywhere. */
+var TYPES = {
+  agent:   {name:"Agent",          desc:"A voice or presence — you name it.",            color:"agent"},
+  real:    {name:"Real thing",     desc:"An event, person, or perception the experiences use.", color:"real"},
+  feeling: {name:"Feeling/weather",desc:"An emotional state that arrives, like weather.", color:"feeling"},
+  rule:    {name:"Rule",           desc:"A rule the system enforces — or changed.",      color:"rule"},
+  claim:   {name:"Claim",          desc:"A prediction, grade, judgment, or declaration.",color:"claim"},
+  memory:  {name:"Memory used",    desc:"A real memory that gets mined and used.",       color:"memory"},
+  drain:   {name:"Drain",          desc:"Something that costs you energy.",              color:"drain"}
+};
+var TYPE_IDS = ["agent","real","feeling","rule","claim","memory","drain"];
+var TYPE_COUNTER = {agent:"Voice", real:"Real thing", feeling:"Feeling", rule:"Rule", claim:"Claim", memory:"Memory", drain:"Drain"};
+
+var state = null;
+var view = "doors";          /* doors | storm | picture | build | insights | map */
+var linking = false;           /* link mode on the board */
+var linkPick = null;           /* first piece picked for a link */
+var pendingPlace = null;       /* tray piece waiting for a board tap */
+var editingId = null;          /* piece being edited in the sheet */
+var pendingLink = null;        /* {a,b} waiting for optional label */
+
+function uid(){ return "p" + Date.now().toString(36) + Math.floor(Math.random()*1e6).toString(36); }
+function esc(s){
+  return String(s == null ? "" : s)
+    .replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;")
+    .replace(/"/g,"&quot;").replace(/'/g,"&#39;");
+}
+function blankState(){
+  return {demo:false, pieces:{}, links:{}, additions:"", finished:false};
+}
+function load(){
+  try{
+    var raw = localStorage.getItem(STORE_KEY);
+    state = raw ? JSON.parse(raw) : blankState();
+  }catch(e){ state = blankState(); }
+  if(!state.pieces) state.pieces = {};
+  if(!state.links) state.links = {};
+}
+function save(){
+  try{ localStorage.setItem(STORE_KEY, JSON.stringify(state)); }catch(e){}
+}
+/* ---- storm fragments: a separate store (the "defer" concession) ----
+   Captured in the overwhelm moment, sorted later — or never. They are
+   never counted, never nagged about, never shown in storm mode. */
+var STORM_KEY = "triangulation_storm_v1";
+var storm = null;
+var stormJustCaught = false;
+function stormBlank(){ return {frags:[]}; }
+function stormLoad(){
+  try{
+    var raw = localStorage.getItem(STORM_KEY);
+    storm = raw ? JSON.parse(raw) : stormBlank();
+  }catch(e){ storm = stormBlank(); }
+  if(!storm.frags) storm.frags = [];
+}
+function stormSave(){
+  try{ localStorage.setItem(STORM_KEY, JSON.stringify(storm)); }catch(e){}
+}
+function piecesArr(){ return Object.keys(state.pieces).map(function(k){ return state.pieces[k]; }); }
+function linksArr(){ return Object.keys(state.links).map(function(k){ return state.links[k]; }); }
+function placedPieces(){ return piecesArr().filter(function(p){ return p.onBoard; }); }
+function trayPieces(){ return piecesArr().filter(function(p){ return !p.onBoard; }); }
+</script>
+<script>
+"use strict";
+/* === INSIGHT ENGINE (pure, DOM-free) ===
+   Reads the board configuration and produces provisional insight
+   statements. No DOM access here — everything comes through the
+   pieces/links arguments, so this block can be unit-tested in node.
+   Language rules: provisional ("your map suggests…"), framework
+   vocabulary, never medicalized, never a verdict on the person. */
+
+var CORNERS = [
+  {id:"voices", label:"The voices", x:0.50, y:0.07,
+   gloss:"the voices and what they do — the identities, the claims, the rules"},
+  {id:"real",   label:"Real things", x:0.08, y:0.92,
+   gloss:"real things from your world being pulled in and given meaning"},
+  {id:"you",    label:"You", x:0.92, y:0.92,
+   gloss:"pressure landing directly on you — where the lines meet"}
+];
+function cornerById(id){
+  for(var i=0;i<CORNERS.length;i++) if(CORNERS[i].id===id) return CORNERS[i];
+  return null;
+}
+function nearestCorner(x, y){
+  var best = CORNERS[0], bd = 1e9;
+  CORNERS.forEach(function(c){
+    var d = Math.hypot(x - c.x, y - c.y);
+    if(d < bd){ bd = d; best = c; }
+  });
+  return {corner:best, dist:bd};
+}
+/* Which triangle edge does a link travel along? Classified by the
+   corners each endpoint sits nearest to. */
+var EDGE_GLOSS = {
+  "real+voices": "recruitment — the voices pointing at real things, turning them into evidence. This is the triangulation line itself.",
+  "voices+you":  "direct pressure — the experiences coming straight at you, no middleman.",
+  "real+you":    "your ground being used — your own world turned into material for the experiences."
+};
+function edgeKey(c1, c2){
+  if(c1 === c2) return "within:" + c1;
+  return [c1, c2].sort().join("+");
+}
+
+function computeInsights(pieces, links){
+  var placed = pieces.filter(function(p){ return p.onBoard; });
+  var out = [];
+  if(!placed.length) return out;
+
+  /* degree map: how many links each piece has */
+  var degree = {};
+  placed.forEach(function(p){ degree[p.id] = 0; });
+  links.forEach(function(l){
+    if(degree[l.a] != null) degree[l.a]++;
+    if(degree[l.b] != null) degree[l.b]++;
+  });
+
+  /* 1. Dominant corner — where do the pieces cluster? */
+  var counts = {voices:0, real:0, you:0};
+  placed.forEach(function(p){ counts[nearestCorner(p.x, p.y).corner.id]++; });
+  var top = Object.keys(counts).sort(function(a,b){ return counts[b]-counts[a]; });
+  var leaders = top.filter(function(k){ return counts[k] === counts[top[0]] && counts[k] > 0; });
+  if(counts[top[0]] > 0){
+    if(leaders.length === 1){
+      var c = cornerById(leaders[0]);
+      out.push({
+        kind:"dominant",
+        title:"Your map leans toward " + c.label.toLowerCase(),
+        body:"Most of your pieces sit near " + c.label.toLowerCase() + " — your map suggests your experiences work mainly through " + c.gloss + ".",
+        prov:"Counted by nearest corner: " + counts.voices + " near the voices, " + counts.real + " near real things, " + counts.you + " near you."
+      });
+    } else {
+      var names = leaders.map(function(k){ return cornerById(k).label.toLowerCase(); }).join(" and ");
+      out.push({
+        kind:"dominant",
+        title:"Your map is split between " + names,
+        body:"Your pieces cluster in two corners at once — your map suggests the experiences are working through both, not one.",
+        prov:"Counted by nearest corner: " + counts.voices + " near the voices, " + counts.real + " near real things, " + counts.you + " near you."
+      });
+    }
+  }
+
+  /* 2. Hub — the most-linked piece */
+  var hubId = null, hubDeg = 0;
+  placed.forEach(function(p){ if(degree[p.id] > hubDeg){ hubDeg = degree[p.id]; hubId = p.id; } });
+  if(hubId && hubDeg >= 2){
+    var hub = null;
+    placed.forEach(function(p){ if(p.id === hubId) hub = p; });
+    out.push({
+      kind:"hub",
+      title:"\u201c" + hub.label + "\u201d is the hub",
+      body:"Almost everything on your map runs through this piece — it has " + hubDeg + " lines attached, more than anything else. In the picture's terms, that's the piece the rest of the system routes through.",
+      prov:hubDeg + " links attached to this piece."
+    });
+  }
+
+  /* 3. Edges — which triangle lines carry the traffic? (busiest first;
+     the second-busiest is appended at the end, only if there is room) */
+  var edgeCounts = {};
+  links.forEach(function(l){
+    var pa = null, pb = null;
+    placed.forEach(function(p){ if(p.id===l.a) pa=p; if(p.id===l.b) pb=p; });
+    if(!pa || !pb) return;
+    var k = edgeKey(nearestCorner(pa.x,pa.y).corner.id, nearestCorner(pb.x,pb.y).corner.id);
+    edgeCounts[k] = (edgeCounts[k]||0) + 1;
+  });
+  var crossEdges = Object.keys(edgeCounts).filter(function(k){ return EDGE_GLOSS[k]; })
+    .sort(function(a,b){ return edgeCounts[b]-edgeCounts[a]; });
+  function edgeInsight(k){
+    var n = edgeCounts[k];
+    return {
+      kind:"edge",
+      title:"The busiest line: " + k.split("+").map(function(id){ return cornerById(id).label.toLowerCase(); }).join(" \u2194 "),
+      body:"Your map suggests " + EDGE_GLOSS[k] + " (" + n + " line" + (n===1?"":"s") + " on this edge.)",
+      prov:n + " link(s) along this edge."
+    };
+  }
+  var extraEdges = [];
+  if(crossEdges.length) out.push(edgeInsight(crossEdges[0]));
+  if(crossEdges.length > 1) extraEdges = crossEdges.slice(1,2).map(edgeInsight);
+
+  /* 4. You-ness check — their pieces sitting near your corner */
+  var nearYou = placed.filter(function(p){
+    var nc = nearestCorner(p.x, p.y);
+    return nc.corner.id === "you" && nc.dist < 0.32 &&
+           (p.type === "agent" || p.type === "claim" || p.type === "rule");
+  });
+  var younessIds = {};
+  nearYou.slice(0,2).forEach(function(p){
+    younessIds[p.id] = true;
+    out.push({
+      kind:"youness",
+      title:"Is \u201c" + p.label + "\u201d yours — or theirs?",
+      body:"You've placed this near your corner. A question your map raises: does it belong to you, or is it one of theirs, sitting close?",
+      prov:"Type: " + p.type + "; placed nearest your corner."
+    });
+  });
+
+  /* 5. Isolated pieces — no links at all. Most adrift first (farthest
+     from any corner), and skip pieces already raised by the you-ness check. */
+  var isolated = placed
+    .filter(function(p){ return degree[p.id] === 0 && !younessIds[p.id]; })
+    .map(function(p){ return {p:p, d:nearestCorner(p.x, p.y).dist}; })
+    .sort(function(a,b){ return b.d - a.d; });
+  isolated.slice(0,2).forEach(function(it){
+    out.push({
+      kind:"isolated",
+      title:"\u201c" + it.p.label + "\u201d sits alone",
+      body:"This piece has no lines to anything else. A loose thread — or something the picture hasn't caught yet?",
+      prov:"No links attached."
+    });
+  });
+
+  /* 6. Empty zones — a corner with nothing near it (only when the map has some weight) */
+  if(placed.length >= 3){
+    CORNERS.forEach(function(c){
+      if(counts[c.id] === 0 && out.length < 7){
+        out.push({
+          kind:"empty",
+          title:"Nothing near " + c.label.toLowerCase(),
+          body:"No pieces sit near this corner. Is that right — or is something missing from the map?",
+          prov:"Zero pieces nearest this corner."
+        });
+      }
+    });
+  }
+
+  /* 7. Energy — the drain count is the cost ledger */
+  var drains = placed.filter(function(p){ return p.type === "drain"; }).length;
+  if(drains > 0){
+    out.push({
+      kind:"energy",
+      title:"You've named " + drains + " drain" + (drains===1?"":"s"),
+      body:"That's the cost ledger — the energy the system takes. Named drains are the one part of the map that's measured in what it costs you.",
+      prov:drains + " drain piece(s) on the board."
+    });
+  }
+
+  /* 8. Tray — named but not yet placed */
+  var trayN = pieces.length - placed.length;
+  if(trayN > 0){
+    out.push({
+      kind:"tray",
+      title:trayN + " piece" + (trayN===1?"":"s") + " still on the table",
+      body:"Named, but not placed on the triangle yet. They're not on the map — but naming them still counts.",
+      prov:trayN + " piece(s) in the tray."
+    });
+  }
+
+  /* Second-busiest edge, only if there is room left under the cap */
+  extraEdges.forEach(function(e){ if(out.length < 7) out.push(e); });
+
+  return out.slice(0, 7);
+}
+/* === END INSIGHT ENGINE === */
+</script>
+<script>
+"use strict";
+/* ---------- board geometry ---------- */
+var BW = 1000, BH = 880;   /* board viewBox; piece coords are 0..1 fractions */
+function cx(fx){ return (fx*BW).toFixed(1); }
+function cy(fy){ return (fy*BH).toFixed(1); }
+
+function boardSVG(){
+  /* The triangle: voices top, real things bottom-left, you bottom-right.
+     Drawn first so chips and links sit above it. */
+  var s = '<svg class="board" viewBox="0 0 '+BW+' '+BH+'" role="img" aria-label="Triangle board: the voices, real things, and you">';
+  s += '<polygon points="'+cx(0.5)+','+cy(0.07)+' '+cx(0.08)+','+cy(0.92)+' '+cx(0.92)+','+cy(0.92)+'" fill="#476b5c" fill-opacity="0.07" stroke="#476b5c" stroke-width="2"/>';
+  /* links group (under chips, above triangle) */
+  s += '<g id="linkLayer"></g>';
+  /* corner labels */
+  s += '<text x="'+cx(0.5)+'" y="'+cy(0.045)+'" text-anchor="middle" font-size="30" font-weight="700" fill="#2b2620">The voices</text>';
+  s += '<text x="'+cx(0.08)+'" y="'+cy(0.975)+'" text-anchor="middle" font-size="30" font-weight="700" fill="#2b2620">Real things</text>';
+  s += '<text x="'+cx(0.92)+'" y="'+cy(0.975)+'" text-anchor="middle" font-size="30" font-weight="700" fill="#2b2620">You</text>';
+  /* edge whispers */
+  s += '<text x="'+cx(0.27)+'" y="'+cy(0.52)+'" font-size="20" fill="#a09a8d" font-style="italic" text-anchor="middle" transform="rotate(-52 '+cx(0.27)+' '+cy(0.52)+')">points at</text>';
+  s += '<text x="'+cx(0.73)+'" y="'+cy(0.52)+'" font-size="20" fill="#a09a8d" font-style="italic" text-anchor="middle" transform="rotate(52 '+cx(0.73)+' '+cy(0.52)+')">lands on</text>';
+  s += '<text x="'+cx(0.5)+'" y="'+cy(0.965)+'" font-size="20" fill="#a09a8d" font-style="italic" text-anchor="middle">becomes evidence</text>';
+  s += '</svg>';
+  return s;
+}
+function renderLinks(){
+  var g = document.getElementById("linkLayer");
+  if(!g) return;
+  var h = "";
+  linksArr().forEach(function(l){
+    var a = state.pieces[l.a], b = state.pieces[l.b];
+    if(!a || !b || !a.onBoard || !b.onBoard) return;
+    var x1=cx(a.x), y1=cy(a.y), x2=cx(b.x), y2=cy(b.y);
+    var mx=((+x1 + +x2)/2).toFixed(1), my=((+y1 + +y2)/2).toFixed(1);
+    h += '<line class="linkvis" x1="'+x1+'" y1="'+y1+'" x2="'+x2+'" y2="'+y2+'"/>';
+    h += '<line class="linkhit" data-link="'+l.id+'" x1="'+x1+'" y1="'+y1+'" x2="'+x2+'" y2="'+y2+'"><title>Tap to remove this link</title></line>';
+    if(l.label) h += '<text class="linklbl" x="'+mx+'" y="'+my+'" text-anchor="middle" dy="-6">'+esc(l.label)+'</text>';
+  });
+  g.innerHTML = h;
+  g.querySelectorAll(".linkhit").forEach(function(el){
+    el.addEventListener("pointerdown", function(ev){
+      ev.stopPropagation();
+      var id = el.getAttribute("data-link");
+      var l = state.links[id];
+      if(!l) return;
+      var an = state.pieces[l.a] ? state.pieces[l.a].label : "?";
+      var bn = state.pieces[l.b] ? state.pieces[l.b].label : "?";
+      if(confirm("Remove the link between \u201c"+an+"\u201d and \u201c"+bn+"\u201d?")){
+        delete state.links[id]; save(); renderLinks();
+      }
+    });
+  });
+}
+
+/* ---------- the two doors ---------- */
+function viewDoors(){
+  var h = '<div class="card">';
+  h += '<h2>Two doors. Pick the one that fits right now.</h2>';
+  h += '<p class="lede muted">No wrong choice — and no debt either way. You can always switch.</p>';
+  h += '</div>';
+  h += '<div class="doors">';
+  h += '<button class="door" id="doorStorm"><span class="door-t">Just get it down</span>'
+    + '<span class="door-d">For the overwhelm moment. One sentence, one button. No questions, no sorting — caught, and done.</span></button>';
+  h += '<button class="door" id="doorBuild"><span class="door-t">Piece it together</span>'
+    + '<span class="door-d">For calmer moments. Name the pieces of your experience, place them on the triangle, draw the lines — a puzzle, not a questionnaire.</span></button>';
+  h += '</div>';
+  return h;
+}
+
+/* ---------- storm mode: the quietest screen in the tool ----------
+   One text field, one button, timestamped. No questions, no sorting,
+   no categories, no tray, no counts. A complete act, not a debt. */
+function viewStorm(){
+  var h = '<div class="card storm">';
+  h += '<h2>Just get it down</h2>';
+  if(stormJustCaught){
+    h += '<p class="lede" style="font-size:1.3rem">Caught. That\u2019s enough.</p>';
+    h += '<div class="navrow"><button class="btn" id="stormAnother">Catch another</button>'
+      + '<button class="btn quiet stormDoors">Back to the doors</button></div>';
+  } else {
+    h += '<p class="lede muted">One sentence is plenty. A fragment counts — \u201cthat thing again\u201d is a complete entry.</p>';
+    h += '<textarea class="big stormbox" id="stormText" placeholder="Whatever\u2019s here right now — in your own words." aria-label="Write what\u2019s happening"></textarea>';
+    h += '<p id="stormHint">Even a few words is enough — or come back later. Nothing is lost by waiting.</p>';
+    h += '<div class="navrow"><button class="btn stormcatch" id="stormCatch">Catch it</button>'
+      + '<button class="btn quiet stormDoors">Not now</button></div>';
+  }
+  h += '</div>';
+  return h;
+}
+function catchStorm(){
+  var el = document.getElementById("stormText");
+  var v = el ? el.value.trim() : "";
+  if(!v){
+    var hint = document.getElementById("stormHint");
+    if(hint) hint.style.display = "block";
+    if(el) el.focus();
+    return;
+  }
+  storm.frags.push({id:uid(), text:v, ts:Date.now()});
+  stormSave();
+  stormJustCaught = true;
+  render(); window.scrollTo(0,0);
+}
+
+/* ---------- intro: the picture ---------- */
+function viewPicture(){
+  var h = '<div class="card">';
+  h += '<h2>The picture we\u2019re starting from</h2>';
+  h += '<p class="lede">Here\u2019s the picture this research starts with. Think of a triangle with three corners: <strong>the voices</strong> and everything they do \u2014 <strong>real things from your world that get pulled in</strong> and given meaning (a passing car, a stomach ache, a person you know) \u2014 and <strong>you</strong>, at the third corner.</p>';
+  h += '<p class="lede">What makes the experiences powerful isn\u2019t any one corner on its own. It\u2019s the lines between them: the voices point at real things, real things seem to confirm the voices, and you\u2019re caught where the lines meet. Over time the triangle can start to feel like a <em>territory</em> you\u2019re living inside \u2014 not a thing that happens to you, but ground you\u2019re standing on.</p>';
+  h += '</div>';
+
+  h += '<div class="card">';
+  h += '<h2>How this works — no questions, a puzzle</h2>';
+  h += '<p class="lede">Instead of answering questions, you\u2019ll <strong>build the picture yourself</strong>:</p>';
+  h += '<p class="lede">1. <strong>Name the pieces</strong> of your experience \u2014 a voice, a real thing that gets pulled in, a feeling, a rule, a claim, a memory that gets used, something that drains you. Your words, your names.<br>';
+  h += '2. <strong>Place them on the triangle</strong> \u2014 near a corner if a piece belongs there, along an edge or in the middle if it connects things.<br>';
+  h += '3. <strong>Draw the lines</strong> between pieces that connect \u2014 what uses what, what feeds what.<br>';
+  h += '4. Then ask the map <strong>what it shows</strong> \u2014 it reads your arrangement back to you, provisionally, in plain language.</p>';
+  h += '<p class="lede muted">Nothing is required. Even one piece is a map. Stop whenever you like \u2014 everything is saved on this device as you go.</p>';
+  h += '<details class="note"><summary>Why are we asking? (the honest research note)</summary>';
+  h += '<p class="small">This picture was drawn from one person\u2019s detailed account of these experiences, checked against published research. One person\u2019s picture isn\u2019t everyone\u2019s \u2014 that\u2019s exactly what we\u2019re trying to learn. Your map helps the lab find out what generalizes and what doesn\u2019t: which pieces other people place, where they put them, and what we haven\u2019t named at all.</p>';
+  h += '<p class="small"><strong>Your map is yours first.</strong> It stays in this browser, on this device. Nothing is sent anywhere, there are no accounts, and nobody sees it unless you choose to share it.</p></details>';
+  h += '<div class="navrow">';
+  h += '<button class="btn" id="startBuild">Start building</button>';
+  h += '<button class="btn quiet" id="loadDemoTop">Load a demo board</button>';
+  h += '</div>';
+  h += '<p class="small muted" style="margin-top:10px">The demo board fills in a fictional sample arrangement so researchers can preview the insights view without entering real pieces.</p>';
+  h += '</div>';
+  return h;
+}
+
+/* ---------- build view: tray + board ---------- */
+function viewBuild(){
+  var placed = placedPieces().length, total = piecesArr().length;
+  var h = '<div class="progress"><span><strong>'+placed+' piece'+(placed===1?'':'s')+' placed'+(total>placed?' \u2014 '+(total-placed)+' still on the table':'')+'</strong> \u2014 stop whenever you like.</span></div>';
+
+  h += '<div class="howto"><strong>How placement works:</strong> drag a piece onto the triangle, or tap it and then tap the triangle. Near a corner = this belongs there. Along an edge or in the middle = this connects things. Tap any piece to rename it, add a note, or remove it.</div>';
+
+  /* piece type tray */
+  h += '<div class="card"><h2>Name a piece</h2>';
+  h += '<p class="muted small" style="margin-top:-6px">Tap + to create a piece of that kind, then give it your own name.</p>';
+  h += '<div class="tray-types">';
+  TYPE_IDS.forEach(function(t){
+    var T = TYPES[t];
+    h += '<div class="ptype"><span class="dot d-'+T.color+'"></span>'
+      + '<span><span class="tname">'+T.name+'</span><br><span class="tdesc">'+T.desc+'</span></span>'
+      + '<span style="flex:1"></span>'
+      + '<button class="add" data-addtype="'+t+'" aria-label="Add a '+T.name+' piece">+</button></div>';
+  });
+  h += '</div>';
+
+  /* tray: created but unplaced pieces */
+  var tray = trayPieces();
+  h += '<h3>On the table ('+tray.length+')</h3>';
+  if(!tray.length) h += '<p class="tray-hint">Nothing on the table yet — create a piece above, then place it on the triangle below.</p>';
+  else{
+    h += '<div class="tray-pieces">';
+    tray.forEach(function(p){
+      h += '<div class="chip traychip t-'+p.type+'" data-piece="'+p.id+'" tabindex="0" role="button" aria-label="Edit piece '+esc(p.label)+'"><span class="cdot d-'+TYPES[p.type].color+'"></span>'+esc(p.label)+'</div>';
+    });
+    h += '</div>';
+    h += '<p class="tray-hint">Tap a piece, then tap the triangle to place it.</p>';
+  }
+  h += '</div>';
+
+  /* caught fragments — the unprocessed tray. Quiet by design: no counts
+     as badges, no nagging, only shown when there's something in it,
+     and never visible in storm mode. */
+  if(storm.frags.length){
+    h += '<div class="card"><h2>Caught, not yet sorted</h2>';
+    h += '<p class="muted small" style="margin-top:-6px">Fragments you caught in the storm. Turn one into a piece whenever you like — or don\u2019t. They\u2019re fine here.</p>';
+    storm.frags.forEach(function(f){
+      var d = new Date(f.ts);
+      var when = d.toLocaleDateString(undefined,{month:"short",day:"numeric"})
+        + ", " + d.toLocaleTimeString(undefined,{hour:"numeric",minute:"2-digit"});
+      h += '<div class="frag"><div class="frag-t">'+esc(f.text)+'</div>'
+        + '<div class="frag-meta muted small">'+esc(when)+'</div>'
+        + '<div class="navrow" style="margin-top:10px">'
+        + '<button class="btn secondary small" data-fragpiece="'+f.id+'">Make a piece</button>'
+        + '<button class="btn quiet small" data-fragdel="'+f.id+'">Delete</button>'
+        + '</div></div>';
+    });
+    h += '</div>';
+  }
+
+  /* the board */
+  h += '<div class="card"><h2>The triangle</h2>';
+  h += '<div class="place-hint" id="placeHint">Tap anywhere on the triangle to place \u201c<span id="placeName"></span>\u201d. <button class="btn quiet small" id="cancelPlace" style="margin:6px 0 0">Cancel</button></div>';
+  h += '<div class="board-wrap" id="boardWrap">' + boardSVG() + '<div id="chipLayer"></div></div>';
+  h += '<div class="navrow noprint">';
+  h += '<button class="btn secondary" id="linkToggle" aria-pressed="'+(linking?'true':'false')+'">'+(linking?'Done linking':'Link pieces')+'</button>';
+  h += '<button class="btn" id="toInsights">What does my map show?</button>';
+  h += '</div>';
+  if(linking) h += '<p class="small muted">Link mode is on: tap one piece, then another, to draw a line between them. Tap a line to remove it.</p>';
+  h += '<p class="small muted">Keyboard: tab to a piece, arrow keys nudge it, Enter opens its editor.</p>';
+  h += '</div>';
+
+  /* link label editor (appears when two pieces are picked) */
+  h += '<div id="linkHost"></div>';
+  return h;
+}
+
+function chipHTML(p){
+  var cls = "chip t-"+p.type;
+  if(editingId === p.id) cls += " selected";
+  if(linkPick === p.id) cls += " linkpick";
+  return '<div class="'+cls+'" data-piece="'+p.id+'" tabindex="0" role="button" '
+    + 'aria-label="Piece: '+esc(p.label)+'. Drag to move, or tap to edit." '
+    + 'style="left:'+(p.x*100).toFixed(2)+'%;top:'+(p.y*100).toFixed(2)+'%">'
+    + '<span class="cdot d-'+TYPES[p.type].color+'"></span>'+esc(p.label)+'</div>';
+}
+function renderChips(){
+  var layer = document.getElementById("chipLayer");
+  if(!layer) return;
+  layer.innerHTML = placedPieces().map(chipHTML).join("");
+  layer.querySelectorAll(".chip").forEach(bindChip);
+}
+
+function bindBoard(){
+  var wrap = document.getElementById("boardWrap");
+  if(!wrap) return;
+  /* tap on empty board = place pending piece */
+  wrap.addEventListener("pointerdown", function(ev){
+    if(ev.target.closest(".chip") || ev.target.closest(".linkhit")) return;
+    if(pendingPlace && state.pieces[pendingPlace]){
+      var r = wrap.getBoundingClientRect();
+      var fx = (ev.clientX - r.left)/r.width, fy = (ev.clientY - r.top)/r.height;
+      var p = state.pieces[pendingPlace];
+      p.x = Math.min(0.97, Math.max(0.03, fx));
+      p.y = Math.min(0.97, Math.max(0.03, fy));
+      p.onBoard = true;
+      pendingPlace = null; save(); render();
+    }
+  });
+  var cp = document.getElementById("cancelPlace");
+  if(cp) cp.addEventListener("click", function(){ pendingPlace = null; render(); });
+}
+
+function bindChip(el){
+  var id = el.getAttribute("data-piece");
+  var p = state.pieces[id];
+  if(!p) return;
+  var wrap = document.getElementById("boardWrap");
+  var startX=0, startY=0, sx=0, sy=0, moved=false;
+
+  el.addEventListener("pointerdown", function(ev){
+    ev.stopPropagation();
+    ev.preventDefault();
+    startX = ev.clientX; startY = ev.clientY; sx = p.x; sy = p.y; moved = false;
+    el.classList.add("dragging");
+    try{ el.setPointerCapture(ev.pointerId); }catch(e){}
+    var onMove = function(e2){
+      var r = wrap.getBoundingClientRect();
+      var dx = (e2.clientX - startX)/r.width, dy = (e2.clientY - startY)/r.height;
+      if(Math.hypot(e2.clientX-startX, e2.clientY-startY) > 6) moved = true;
+      if(moved){
+        p.x = Math.min(0.97, Math.max(0.03, sx+dx));
+        p.y = Math.min(0.97, Math.max(0.03, sy+dy));
+        el.style.left = (p.x*100).toFixed(2)+"%";
+        el.style.top = (p.y*100).toFixed(2)+"%";
+        renderLinks();
+      }
+    };
+    var onUp = function(e3){
+      el.classList.remove("dragging");
+      el.removeEventListener("pointermove", onMove);
+      el.removeEventListener("pointerup", onUp);
+      el.removeEventListener("pointercancel", onUp);
+      if(moved){ save(); }
+      else { handleChipTap(id); }
+    };
+    el.addEventListener("pointermove", onMove);
+    el.addEventListener("pointerup", onUp);
+    el.addEventListener("pointercancel", onUp);
+  });
+
+  el.addEventListener("keydown", function(ev){
+    var stepN = 0.02, handled = true;
+    if(ev.key === "ArrowLeft") p.x = Math.max(0.03, p.x-stepN);
+    else if(ev.key === "ArrowRight") p.x = Math.min(0.97, p.x+stepN);
+    else if(ev.key === "ArrowUp") p.y = Math.max(0.03, p.y-stepN);
+    else if(ev.key === "ArrowDown") p.y = Math.min(0.97, p.y+stepN);
+    else if(ev.key === "Enter"){ handleChipTap(id); }
+    else handled = false;
+    if(handled){ ev.preventDefault(); save(); renderChips(); renderLinks(); }
+  });
+}
+
+function handleChipTap(id){
+  var p = state.pieces[id];
+  if(!p) return;
+  if(linking){
+    if(!p.onBoard) return;
+    if(!linkPick){ linkPick = id; renderChips(); }
+    else if(linkPick === id){ linkPick = null; renderChips(); }
+    else { openLinkLabel(linkPick, id); linkPick = null; }
+    return;
+  }
+  openEditor(id);
+}
+
+/* ---------- piece editor sheet ---------- */
+function openEditor(id){
+  editingId = id;
+  var p = state.pieces[id];
+  if(!p){ editingId = null; return; }
+  var T = TYPES[p.type];
+  var host = document.getElementById("sheetHost");
+  host.innerHTML =
+    '<div class="sheet" role="dialog" aria-label="Edit piece">'
+    + '<p class="stype">'+T.name+'</p>'
+    + '<h3>'+esc(p.label)+'</h3>'
+    + '<label for="edType">Kind of piece</label>'
+    + '<select id="edType" style="width:100%;padding:12px 14px;border:1px solid var(--line);border-radius:8px;font-size:1rem;font-family:inherit;background:#fff;color:var(--ink)">'
+    + TYPE_IDS.map(function(t){ return '<option value="'+t+'"'+(t===p.type?' selected':'')+'>'+TYPES[t].name+'</option>'; }).join("")
+    + '</select>'
+    + '<label for="edLabel">Name it your way</label>'
+    + '<input type="text" id="edLabel" value="'+esc(p.label)+'" maxlength="80">'
+    + '<label for="edNote">A few words about it <span class="muted" style="font-weight:400">(optional)</span></label>'
+    + '<textarea id="edNote" placeholder="Anything that helps you remember what this piece is.">'+esc(p.note||"")+'</textarea>'
+    + '<div class="navrow">'
+    + '<button class="btn" id="edSave">Done</button>'
+    + (p.onBoard
+        ? '<button class="btn secondary" id="edTray">Move back to the table</button>'
+        : '<button class="btn secondary" id="edPlace">Place on the triangle</button>')
+    + '<button class="btn danger" id="edDelete">Delete piece</button>'
+    + '</div></div>';
+  renderChips();
+  var labelEl = document.getElementById("edLabel");
+  labelEl.focus(); labelEl.select();
+  document.getElementById("edSave").addEventListener("click", function(){
+    var v = labelEl.value.trim();
+    p.type = document.getElementById("edType").value;
+    p.label = v || (TYPE_COUNTER[p.type] + " " + (Object.keys(state.pieces).length));
+    p.note = document.getElementById("edNote").value.trim();
+    save(); closeSheet(); render();
+  });
+  var trayB = document.getElementById("edTray");
+  if(trayB) trayB.addEventListener("click", function(){
+    var v = labelEl.value.trim();
+    p.type = document.getElementById("edType").value;
+    if(v) p.label = v;
+    p.note = document.getElementById("edNote").value.trim();
+    p.onBoard = false; save(); closeSheet(); render();
+  });
+  var placeB = document.getElementById("edPlace");
+  if(placeB) placeB.addEventListener("click", function(){
+    var v = labelEl.value.trim();
+    p.type = document.getElementById("edType").value;
+    if(v) p.label = v;
+    p.note = document.getElementById("edNote").value.trim();
+    save(); closeSheet();
+    pendingPlace = id; render();
+  });
+  document.getElementById("edDelete").addEventListener("click", function(){
+    if(!confirm("Delete \u201c"+p.label+"\u201d and its links?")) return;
+    Object.keys(state.links).forEach(function(k){
+      if(state.links[k].a===id || state.links[k].b===id) delete state.links[k];
+    });
+    delete state.pieces[id];
+    save(); closeSheet(); render();
+  });
+}
+function closeSheet(){
+  editingId = null;
+  document.getElementById("sheetHost").innerHTML = "";
+}
+
+/* ---------- link creation with optional label ---------- */
+function openLinkLabel(a, b){
+  pendingLink = {a:a, b:b};
+  var pa = state.pieces[a], pb = state.pieces[b];
+  var host = document.getElementById("linkHost");
+  host.innerHTML =
+    '<div class="card"><h3>Link \u201c'+esc(pa.label)+'\u201d \u2194 \u201c'+esc(pb.label)+'\u201d</h3>'
+    + '<p class="muted small" style="margin-top:-6px">Optional: one word for what this line means — for example <em>uses</em>, <em>feeds</em>, <em>punishes</em>, <em>protects</em>. Or leave it blank.</p>'
+    + '<input type="text" id="linkWord" maxlength="40" placeholder="one word (optional)" style="width:100%;padding:12px 14px;border:1px solid var(--line);border-radius:8px;font-size:1rem;font-family:inherit;background:#fff;color:var(--ink)">'
+    + '<div class="navrow"><button class="btn" id="linkSave">Draw the line</button>'
+    + '<button class="btn quiet" id="linkCancel">Cancel</button></div></div>';
+  var inp = document.getElementById("linkWord");
+  inp.focus();
+  document.getElementById("linkSave").addEventListener("click", function(){
+    var lid = uid();
+    state.links[lid] = {id:lid, a:a, b:b, label:inp.value.trim()};
+    pendingLink = null; save(); render();
+  });
+  document.getElementById("linkCancel").addEventListener("click", function(){
+    pendingLink = null; render();
+  });
+}
+</script>
+<script>
+"use strict";
+/* ---------- insights: what does the map show? ---------- */
+function viewInsights(){
+  var placed = placedPieces().length;
+  var h = '<div class="card">';
+  h += '<h2>What your map shows</h2>';
+  if(!placed){
+    h += '<p class="empty">Nothing placed on the triangle yet — the map needs at least one piece before it can reflect anything back. Name a piece and place it, then come back.</p>';
+    h += '<div class="navrow"><button class="btn" id="iBuild">Go build</button></div>';
+    h += '</div>';
+    return h;
+  }
+  var insights = computeInsights(piecesArr(), linksArr());
+  if(!insights.length){
+    h += '<p class="empty">Your map is very new — place a few more pieces or draw some lines and the reflections will appear.</p>';
+  }
+  insights.forEach(function(ins){
+    h += '<div class="insight"><p class="it">'+esc(ins.title)+'</p><p>'+esc(ins.body)+'</p>'
+      + '<p class="prov">'+esc(ins.prov)+'</p></div>';
+  });
+  h += '<div class="disclaimer"><strong>Read this as a mirror, not a verdict.</strong> These lines are reflections of the arrangement <em>you</em> built — where you put things, what you linked. They are not conclusions about you, and they\u2019re not a picture anyone else should draw for you. If a reflection feels wrong, the map is wrong, not you.</div>';
+  h += '<div class="navrow"><button class="btn secondary" id="iBuild">Keep building</button>';
+  h += '<button class="btn" id="iMap">See the full map</button></div>';
+  h += '</div>';
+  return h;
+}
+
+/* ---------- your map: pieces, links, additions, export ---------- */
+function viewMap(){
+  var placed = placedPieces(), tray = trayPieces(), links = linksArr();
+  var h = '<div class="card">';
+  h += '<h2>Your map</h2>';
+  if(!placed.length && !tray.length && !(state.additions && state.additions.trim())){
+    h += '<p class="empty">Nothing mapped yet — that\u2019s completely fine. Build a few pieces whenever you like, or load the demo board to see what a finished map looks like.</p>';
+    h += '<div class="navrow"><button class="btn" id="mBuild">Start building</button>';
+    h += '<button class="btn quiet" id="mDemo">Load a demo board</button></div>';
+    h += '</div>';
+    return h;
+  }
+  h += '<div class="tally">';
+  h += '<div class="pill"><b>'+placed.length+'</b>pieces placed</div>';
+  h += '<div class="pill"><b>'+links.length+'</b>lines drawn</div>';
+  if(tray.length) h += '<div class="pill"><b>'+tray.length+'</b>on the table</div>';
+  h += '</div>';
+
+  /* mini static board snapshot */
+  h += '<div class="board-wrap" style="touch-action:auto" aria-hidden="true">' + boardSVG() + '<div>';
+  placed.forEach(function(p){
+    h += '<div class="chip t-'+p.type+'" style="left:'+(p.x*100).toFixed(2)+'%;top:'+(p.y*100).toFixed(2)+'%;cursor:default">'
+      + '<span class="cdot d-'+TYPES[p.type].color+'"></span>'+esc(p.label)+'</div>';
+  });
+  h += '</div></div>';
+  h += '<p class="small muted">A snapshot of your triangle. Links render in the interactive views.</p>';
+
+  /* pieces with notes */
+  var noted = placed.concat(tray).filter(function(p){ return p.note && p.note.trim(); });
+  if(noted.length){
+    h += '<h3>Pieces, in your words</h3>';
+    noted.forEach(function(p){
+      h += '<div class="resitem"><div class="t"><span class="cdot d-'+TYPES[p.type].color+'" style="display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:7px"></span>'
+        + esc(p.label)+' <span class="muted small">\u2014 '+esc(TYPES[p.type].name)+'</span></div>'
+        + '<div class="note">'+esc(p.note.trim())+'</div></div>';
+    });
+  }
+  /* links */
+  if(links.length){
+    h += '<h3>Lines drawn</h3>';
+    links.forEach(function(l){
+      var a = state.pieces[l.a], b = state.pieces[l.b];
+      if(!a || !b) return;
+      h += '<div class="resitem"><div class="t">\u201c'+esc(a.label)+'\u201d \u2194 \u201c'+esc(b.label)+'\u201d'
+        + (l.label ? ' <span class="muted small">\u2014 '+esc(l.label)+'</span>' : '') + '</div></div>';
+    });
+  }
+  /* additions */
+  h += '<h3>What the picture missed</h3>';
+  h += '<textarea class="big" id="addText" placeholder="Anything your experience includes that the pieces didn\u2019t catch — in your own words, at your own pace."></textarea>';
+  h += '<p class="small muted" style="margin-top:8px">Optional. Saved automatically as you type.</p>';
+
+  h += '<div class="navrow noprint"><button class="btn secondary small" id="dlJson">Download as JSON</button>';
+  h += '<button class="btn secondary small" id="doPrint">Print</button>';
+  if(state.demo) h += '<button class="btn quiet small" id="mClearDemo">Clear demo board</button>';
+  h += '</div>';
+  h += '</div>';
+  return h;
+}
+function bindMap(){
+  var b = document.getElementById("mBuild");
+  if(b) b.addEventListener("click", function(){ view="build"; render(); window.scrollTo(0,0); });
+  var d = document.getElementById("mDemo");
+  if(d) d.addEventListener("click", loadDemo);
+  var cd = document.getElementById("mClearDemo");
+  if(cd) cd.addEventListener("click", clearDemo);
+  var el = document.getElementById("addText");
+  if(el){
+    el.value = state.additions || "";
+    var t = null;
+    el.addEventListener("input", function(){
+      clearTimeout(t);
+      t = setTimeout(function(){ state.additions = el.value; save(); }, 400);
+    });
+  }
+  var dl = document.getElementById("dlJson");
+  if(dl) dl.addEventListener("click", downloadJSON);
+  var pr = document.getElementById("doPrint");
+  if(pr) pr.addEventListener("click", function(){ window.print(); });
+}
+function downloadJSON(){
+  var insights = computeInsights(piecesArr(), linksArr());
+  var out = {
+    instrument: "Triangulation: Build Your Map",
+    version: 2,
+    demo: !!state.demo,
+    exported_at: new Date().toISOString(),
+    pieces: piecesArr().map(function(p){
+      var nc = p.onBoard ? nearestCorner(p.x, p.y).corner.id : null;
+      return {id:p.id, type:p.type, type_name:TYPES[p.type].name,
+              label:p.label, note:(p.note||"").trim()||null,
+              on_board:!!p.onBoard,
+              x:p.onBoard?+p.x.toFixed(3):null, y:p.onBoard?+p.y.toFixed(3):null,
+              nearest_corner:nc};
+    }),
+    links: linksArr().map(function(l){
+      var a = state.pieces[l.a], b = state.pieces[l.b];
+      return {a_label:a?a.label:null, b_label:b?b.label:null, word:(l.label||"").trim()||null};
+    }),
+    insights: insights.map(function(i){ return {kind:i.kind, title:i.title, body:i.body}; }),
+    additions: (state.additions||"").trim() || null,
+    storm_fragments: storm.frags.map(function(f){
+      return {text:f.text, caught_at:new Date(f.ts).toISOString()};
+    })
+  };
+  var blob = new Blob([JSON.stringify(out, null, 2)], {type:"application/json"});
+  var a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = "triangulation-map.json";
+  document.body.appendChild(a); a.click();
+  setTimeout(function(){ URL.revokeObjectURL(a.href); a.remove(); }, 500);
+}
+
+/* ---------- fictional demo board ---------- */
+function seedDemo(){
+  var P = {}, L = {};
+  function mk(type,label,note,x,y){
+    var id = "demo_"+type+"_"+label.replace(/[^a-z0-9]+/gi,"").toLowerCase();
+    P[id] = {id:id, type:type, label:label, note:note, x:x, y:y, onBoard:true};
+    return id;
+  }
+  function ln(a,b,word){
+    var id = "demo_l_"+a+"_"+b;
+    L[id] = {id:id, a:a, b:b, label:word||""};
+  }
+  var marlowe = mk("agent","Marlowe","The loud one. Sounds like my old manager.",0.42,0.20);
+  var quiet   = mk("agent","the quiet one","Barely above a whisper. Somehow worse.",0.60,0.12);
+  var bus     = mk("real","the bus braking outside","Every time it brakes I\u2019m sure it\u2019s signaling.",0.20,0.76);
+  var dread   = mk("feeling","3am dread","Wakes me before the alarm. The worst part.",0.50,0.55);
+  var rule    = mk("rule","don\u2019t tell anyone","If I tell, they\u2019ll know I told.",0.78,0.70);
+  var grade   = mk("claim","you\u2019ll fail the review","Said every night the week before my review.",0.58,0.28);
+  var memory  = mk("memory","grandmother\u2019s kitchen","They use her voice. That\u2019s what makes it land.",0.30,0.34);
+  var drain   = mk("drain","arguing back","The most tiring thing I do all day.",0.64,0.58);
+  ln(marlowe, bus, "uses");
+  ln(marlowe, grade, "");
+  ln(grade, dread, "feeds");
+  ln(marlowe, rule, "enforces");
+  ln(marlowe, memory, "mines");
+  ln(marlowe, drain, "feeds");
+  ln(quiet, dread, "");
+  return {demo:true, finished:true,
+    additions:"Nobody else has mentioned the timing thing \u2014 mine always gets worse right before it rains.",
+    pieces:P, links:L};
+}
+function seedStormDemo(){
+  var now = Date.now();
+  return {frags:[
+    {id:"demo_sf1", text:"that thing again at the bus stop", ts:now-2*86400000},
+    {id:"demo_sf2", text:"3am. couldn't tell if it was a dream.", ts:now-86400000},
+    {id:"demo_sf3", text:"Marlowe wouldn't stop during the meeting", ts:now-5*3600000}
+  ]};
+}
+function loadDemo(){
+  if(!confirm("Load a fictional demo board? This replaces your current pieces with invented sample data.")) return;
+  state = seedDemo(); save();
+  storm = seedStormDemo(); stormSave();
+  linking = false; linkPick = null; pendingPlace = null; closeSheet();
+  view = "insights"; render(); window.scrollTo(0,0);
+}
+function clearDemo(){
+  if(!confirm("Clear the demo board and start with a blank one?")) return;
+  state = blankState(); save();
+  storm = stormBlank(); stormSave();
+  linking = false; linkPick = null; pendingPlace = null; closeSheet();
+  view = "doors"; render(); window.scrollTo(0,0);
+}
+
+/* ---------- tabs, banner, router ---------- */
+var TABS = [["doors","Start"],["picture","The picture"],["build","Build"],["insights","Insights"],["map","Your map"]];
+function renderTabs(){
+  var el = document.getElementById("tabs");
+  var h = "";
+  TABS.forEach(function(t){
+    h += '<button class="'+(view===t[0]?"active":"")+'" data-tab="'+t[0]+'">'+t[1]+'</button>';
+  });
+  el.innerHTML = h;
+  el.querySelectorAll("[data-tab]").forEach(function(b){
+    b.addEventListener("click", function(){
+      closeSheet();
+      view = b.getAttribute("data-tab");
+      render(); window.scrollTo(0,0);
+    });
+  });
+}
+function renderBanner(){
+  var el = document.getElementById("demoBanner");
+  if(!state.demo){ el.innerHTML = ""; return; }
+  el.innerHTML = '<div><strong>FICTIONAL DEMO BOARD.</strong> Every piece here is invented to preview the insights view. None of it is real.</div>' +
+    '<div><button class="btn quiet small" id="clearDemoTop" style="margin-top:0">Clear demo board</button></div>';
+  document.getElementById("clearDemoTop").addEventListener("click", clearDemo);
+}
+function render(){
+  renderTabs();
+  renderBanner();
+  closeSheet();
+  var v = document.getElementById("view");
+  if(view === "doors"){
+    v.innerHTML = viewDoors();
+    document.getElementById("doorStorm").addEventListener("click", function(){
+      stormJustCaught = false; view = "storm"; render(); window.scrollTo(0,0);
+    });
+    document.getElementById("doorBuild").addEventListener("click", function(){
+      view = "picture"; render(); window.scrollTo(0,0);
+    });
+  } else if(view === "storm"){
+    v.innerHTML = viewStorm();
+    var sc = document.getElementById("stormCatch");
+    if(sc) sc.addEventListener("click", catchStorm);
+    var st = document.getElementById("stormText");
+    if(st) st.focus();
+    var sa = document.getElementById("stormAnother");
+    if(sa) sa.addEventListener("click", function(){ stormJustCaught = false; render(); window.scrollTo(0,0); });
+    v.querySelectorAll(".stormDoors").forEach(function(b){
+      b.addEventListener("click", function(){ stormJustCaught = false; view = "doors"; render(); window.scrollTo(0,0); });
+    });
+  } else if(view === "picture"){
+    v.innerHTML = viewPicture();
+    document.getElementById("startBuild").addEventListener("click", function(){
+      view = "build"; render(); window.scrollTo(0,0);
+    });
+    document.getElementById("loadDemoTop").addEventListener("click", loadDemo);
+  } else if(view === "build"){
+    v.innerHTML = viewBuild();
+    /* wire + buttons */
+    v.querySelectorAll("[data-addtype]").forEach(function(btn){
+      btn.addEventListener("click", function(){
+        var t = btn.getAttribute("data-addtype");
+        var n = piecesArr().filter(function(p){ return p.type===t; }).length + 1;
+        var id = uid();
+        state.pieces[id] = {id:id, type:t, label:TYPE_COUNTER[t]+" "+n, note:"", x:0.5, y:0.5, onBoard:false};
+        save(); openEditor(id);
+      });
+    });
+    /* tray chips: tap opens editor */
+    v.querySelectorAll(".traychip").forEach(function(ch){
+      ch.addEventListener("click", function(){ openEditor(ch.getAttribute("data-piece")); });
+      ch.addEventListener("keydown", function(ev){
+        if(ev.key==="Enter"){ openEditor(ch.getAttribute("data-piece")); }
+      });
+    });
+    bindBoard();
+    renderChips();
+    renderLinks();
+    /* caught fragments: turn one into a piece, or delete it */
+    v.querySelectorAll("[data-fragpiece]").forEach(function(b){
+      b.addEventListener("click", function(){
+        var fid = b.getAttribute("data-fragpiece");
+        var f = null;
+        storm.frags.forEach(function(x){ if(x.id===fid) f = x; });
+        if(!f) return;
+        var id = uid();
+        state.pieces[id] = {id:id, type:"feeling", label:f.text.slice(0,80), note:"", x:0.5, y:0.5, onBoard:false};
+        storm.frags = storm.frags.filter(function(x){ return x.id!==fid; });
+        stormSave(); save(); openEditor(id);
+      });
+    });
+    v.querySelectorAll("[data-fragdel]").forEach(function(b){
+      b.addEventListener("click", function(){
+        var fid = b.getAttribute("data-fragdel");
+        storm.frags = storm.frags.filter(function(x){ return x.id!==fid; });
+        stormSave(); render();
+      });
+    });
+    /* place hint */
+    if(pendingPlace && state.pieces[pendingPlace]){
+      document.getElementById("placeHint").classList.add("on");
+      document.getElementById("placeName").textContent = state.pieces[pendingPlace].label;
+    }
+    var lt = document.getElementById("linkToggle");
+    lt.addEventListener("click", function(){
+      linking = !linking; linkPick = null; render();
+    });
+    document.getElementById("toInsights").addEventListener("click", function(){
+      linking = false; linkPick = null;
+      state.finished = true; save();
+      view = "insights"; render(); window.scrollTo(0,0);
+    });
+  } else if(view === "insights"){
+    v.innerHTML = viewInsights();
+    var ib = document.getElementById("iBuild");
+    if(ib) ib.addEventListener("click", function(){ view="build"; render(); window.scrollTo(0,0); });
+    var im = document.getElementById("iMap");
+    if(im) im.addEventListener("click", function(){ view="map"; render(); window.scrollTo(0,0); });
+  } else {
+    v.innerHTML = viewMap();
+    bindMap();
+  }
+  var e = document.getElementById("eraseAll");
+  if(e) e.onclick = function(){
+    if(!confirm("Erase your entire map \u2014 all pieces, links, caught fragments, and additions? This can\u2019t be undone.")) return;
+    state = blankState(); save();
+    storm = stormBlank(); stormSave();
+    linking = false; linkPick = null; pendingPlace = null;
+    view = "doors"; render(); window.scrollTo(0,0);
+  };
+}
+
+load();
+stormLoad();
+render();
+var sb = document.getElementById("stormBtn");
+if(sb) sb.addEventListener("click", function(){
+  closeSheet(); stormJustCaught = false; view = "storm"; render(); window.scrollTo(0,0);
+});
+</script>
+</body>
+</html>
