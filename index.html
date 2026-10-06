@@ -185,6 +185,8 @@
   .door:hover{border-color:var(--accent)}
   .door .door-t{display:block; font-family:Georgia,serif; font-size:1.5rem; font-weight:600; margin-bottom:8px}
   .door .door-d{display:block; color:var(--muted); font-size:.98rem; line-height:1.6}
+  /* ---- guided tour ---- */
+  .tourbar{border:2px solid var(--accent)}
   /* ---- storm mode: the quietest screen ---- */
   .storm{max-width:640px; margin:24px auto}
   .stormbox{min-height:30vh; font-size:1.15rem}
@@ -252,6 +254,7 @@ var TYPE_COUNTER = {agent:"Voice", real:"Real thing", feeling:"Feeling", rule:"R
 
 var state = null;
 var view = "doors";          /* doors | storm | picture | build | insights | map */
+var tour = -1;               /* guided tour step index; -1 = off */
 var linking = false;           /* link mode on the board */
 var linkPick = null;           /* first piece picked for a link */
 var pendingPlace = null;       /* tray piece waiting for a board tap */
@@ -550,6 +553,12 @@ function renderLinks(){
 /* ---------- the two doors ---------- */
 function viewDoors(){
   var h = '<div class="card">';
+  h += '<h2>Ever Present</h2>';
+  h += '<p class="lede">A personal atlas for people who hear voices. Not a treatment, not a monitor. A private place to get experiences down in your own words and map them when you\u2019re calmer.</p>';
+  h += '<p class="lede muted">Everything stays on this device. Nothing is scored, shared, or sent anywhere.</p>';
+  h += '<div class="navrow"><button class="btn" id="tourStart">Show me around (2 min)</button></div>';
+  h += '</div>';
+  h += '<div class="card">';
   h += '<h2>Two doors. Pick the one that fits right now.</h2>';
   h += '<p class="lede muted">No wrong choice — and no debt either way. You can always switch.</p>';
   h += '</div>';
@@ -1099,6 +1108,33 @@ function clearDemo(){
 
 /* ---------- tabs, banner, router ---------- */
 var TABS = [["doors","Start"],["picture","The picture"],["build","Build"],["insights","Insights"],["map","Your map"]];
+
+/* ---------- guided tour: the 2-minute story ----------
+   Walks a first-time viewer through picture -> build -> insights -> map.
+   Tours their own map if they have one; otherwise loads the fictional board. */
+var TOUR = [
+  {view:"picture", cap:"The idea: a triangle with three corners, the voices, real things they pull in, and you. The power isn\u2019t in any corner. It\u2019s in the lines between them."},
+  {view:"build", cap:"Name the pieces of your experience in your own words, place them on the triangle, draw the lines between pieces that connect."},
+  {view:"insights", cap:"The map reflects back what it sees, provisionally, in plain language. A mirror, not a verdict."},
+  {view:"map", cap:"Your atlas. Everything you made, on this device. Nothing scored, nothing shared."}
+];
+function tourBar(){
+  var h = '<div class="card tourbar"><p class="lede" style="margin:0 0 10px"><strong>Tour '+(tour+1)+' of '+TOUR.length+':</strong> '+TOUR[tour].cap+'</p>';
+  h += '<div class="navrow" style="margin-top:0">';
+  if(tour>0) h += '<button class="btn secondary small" id="tourBack">Back</button>';
+  h += '<button class="btn small" id="tourNext">'+(tour<TOUR.length-1?'Next':'Finish')+'</button>';
+  h += '<button class="btn quiet small" id="tourExit">Exit tour</button>';
+  h += '</div></div>';
+  return h;
+}
+function startTour(){
+  if(!piecesArr().length && !storm.frags.length && !(state.additions && state.additions.trim())){
+    state = seedDemo(); save();
+    storm = seedStormDemo(); stormSave();
+  }
+  linking = false; linkPick = null; pendingPlace = null; closeSheet();
+  tour = 0; view = TOUR[0].view; render(); window.scrollTo(0,0);
+}
 function renderTabs(){
   var el = document.getElementById("tabs");
   var h = "";
@@ -1109,6 +1145,7 @@ function renderTabs(){
   el.querySelectorAll("[data-tab]").forEach(function(b){
     b.addEventListener("click", function(){
       closeSheet();
+      tour = -1;
       view = b.getAttribute("data-tab");
       render(); window.scrollTo(0,0);
     });
@@ -1128,6 +1165,7 @@ function render(){
   var v = document.getElementById("view");
   if(view === "doors"){
     v.innerHTML = viewDoors();
+    document.getElementById("tourStart").addEventListener("click", startTour);
     document.getElementById("doorStorm").addEventListener("click", function(){
       stormJustCaught = false; view = "storm"; render(); window.scrollTo(0,0);
     });
@@ -1216,6 +1254,21 @@ function render(){
   } else {
     v.innerHTML = viewMap();
     bindMap();
+  }
+  /* guided tour bar: prepended without disturbing the view's own listeners */
+  if(tour >= 0 && tour < TOUR.length){
+    v.insertAdjacentHTML("afterbegin", tourBar());
+    var tb = document.getElementById("tourBack");
+    if(tb) tb.addEventListener("click", function(){ tour--; view = TOUR[tour].view; render(); window.scrollTo(0,0); });
+    var tn = document.getElementById("tourNext");
+    if(tn) tn.addEventListener("click", function(){
+      tour++;
+      if(tour >= TOUR.length){ tour = -1; }
+      else { view = TOUR[tour].view; }
+      render(); window.scrollTo(0,0);
+    });
+    var te = document.getElementById("tourExit");
+    if(te) te.addEventListener("click", function(){ tour = -1; render(); });
   }
   var e = document.getElementById("eraseAll");
   if(e) e.onclick = function(){
