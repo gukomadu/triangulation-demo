@@ -556,7 +556,7 @@ function viewDoors(){
   h += '<h2>Ever Present</h2>';
   h += '<p class="lede">A personal atlas for people who hear voices. Not a treatment, not a monitor. A private place to get experiences down in your own words and map them when you\u2019re calmer.</p>';
   h += '<p class="lede muted">Everything stays on this device. Nothing is scored, shared, or sent anywhere.</p>';
-  h += '<div class="navrow"><button class="btn" id="tourStart">Show me around (2 min)</button></div>';
+  h += '<div class="navrow"><button class="btn" id="tourStart">Show me around (3 min)</button></div>';
   h += '</div>';
   h += '<div class="card">';
   h += '<h2>Two doors. Pick the one that fits right now.</h2>';
@@ -976,8 +976,32 @@ function viewMap(){
 
   h += '<div class="navrow noprint"><button class="btn secondary small" id="dlJson">Download as JSON</button>';
   h += '<button class="btn secondary small" id="doPrint">Print</button>';
+  h += '<button class="btn small" id="mResults">What this gives you</button>';
   if(state.demo) h += '<button class="btn quiet small" id="mClearDemo">Clear demo board</button>';
   h += '</div>';
+  h += '</div>';
+  return h;
+}
+/* ---------- results: the point of the exercise ----------
+   Not more machinery. What the person walks away with: the experience
+   externalized, the claims separated from reality, authorship returned.
+   No clinical promises: agency, authorship, privacy, an owned record. */
+function viewResults(){
+  var h = '<div class="card">';
+  h += '<h2>What this gave you</h2>';
+  h += '<p class="lede">Before this, it was all in your head \u2014 mixed together, happening to you, narrated by the voices. Now look at what\u2019s on the table.</p>';
+  h += '<div class="resitem"><div class="t">It\u2019s outside your head</div>'
+    + '<div class="note">The pieces are on a map you can look at, instead of a storm you\u2019re inside. You can step back from it now.</div></div>';
+  h += '<div class="resitem"><div class="t">The claims are separated from what happened</div>'
+    + '<div class="note">What they said, next to what actually happened \u2014 side by side. Over time, that\u2019s your own evidence. The receipts.</div></div>';
+  h += '<div class="resitem"><div class="t">You can see the move</div>'
+    + '<div class="note">The triangle shows the tactic: the voices, the real things they pull in, and you \u2014 with lines fixing your position. Seeing how it works takes some of its power away.</div></div>';
+  h += '<div class="resitem"><div class="t">You\u2019re the reader now</div>'
+    + '<div class="note">You named every piece. You drew every line. The story is yours to tell \u2014 not theirs to narrate.</div></div>';
+  h += '<div class="resitem"><div class="t">It\u2019s yours</div>'
+    + '<div class="note">On this device. Nothing scored, nothing sent, nothing shared. The record belongs to the person who made it.</div></div>';
+  h += '<div class="disclaimer"><strong>Ever Present doesn\u2019t treat anything. It doesn\u2019t predict anything.</strong> It witnesses \u2014 and hands you the record.</div>';
+  h += '<div class="navrow"><button class="btn secondary" id="rMap">Back to your map</button></div>';
   h += '</div>';
   return h;
 }
@@ -988,6 +1012,8 @@ function bindMap(){
   if(d) d.addEventListener("click", loadDemo);
   var cd = document.getElementById("mClearDemo");
   if(cd) cd.addEventListener("click", clearDemo);
+  var mr = document.getElementById("mResults");
+  if(mr) mr.addEventListener("click", function(){ view="results"; render(); window.scrollTo(0,0); });
   var el = document.getElementById("addText");
   if(el){
     el.value = state.additions || "";
@@ -1110,13 +1136,14 @@ function clearDemo(){
 var TABS = [["doors","Start"],["picture","The picture"],["build","Build"],["insights","Insights"],["map","Your map"]];
 
 /* ---------- guided tour: the 2-minute story ----------
-   Walks a first-time viewer through picture -> build -> insights -> map.
+   Walks a first-time viewer through picture -> build -> insights -> map -> results.
    Tours their own map if they have one; otherwise loads the fictional board. */
 var TOUR = [
   {view:"picture", cap:"The idea: a triangle with three corners, the voices, real things they pull in, and you. The power isn\u2019t in any corner. It\u2019s in the lines between them."},
   {view:"build", cap:"Name the pieces of your experience in your own words, place them on the triangle, draw the lines between pieces that connect."},
   {view:"insights", cap:"The map reflects back what it sees, provisionally, in plain language. A mirror, not a verdict."},
-  {view:"map", cap:"Your atlas. Everything you made, on this device. Nothing scored, nothing shared."}
+  {view:"map", cap:"Your atlas. Everything you made, on this device. Nothing scored, nothing shared."},
+  {view:"results", cap:"The point of the exercise: what you walk away with."}
 ];
 function tourBar(){
   var h = '<div class="card tourbar"><p class="lede" style="margin:0 0 10px"><strong>Tour '+(tour+1)+' of '+TOUR.length+':</strong> '+TOUR[tour].cap+'</p>';
@@ -1251,6 +1278,10 @@ function render(){
     if(ib) ib.addEventListener("click", function(){ view="build"; render(); window.scrollTo(0,0); });
     var im = document.getElementById("iMap");
     if(im) im.addEventListener("click", function(){ view="map"; render(); window.scrollTo(0,0); });
+  } else if(view === "results"){
+    v.innerHTML = viewResults();
+    var rm = document.getElementById("rMap");
+    if(rm) rm.addEventListener("click", function(){ view="map"; render(); window.scrollTo(0,0); });
   } else {
     v.innerHTML = viewMap();
     bindMap();
