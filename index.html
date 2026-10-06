@@ -1021,7 +1021,7 @@ function downloadJSON(){
   var blob = new Blob([JSON.stringify(out, null, 2)], {type:"application/json"});
   var a = document.createElement("a");
   a.href = URL.createObjectURL(blob);
-  a.download = "triangulation-map.json";
+  a.download = "ever-present-map.json";
   document.body.appendChild(a); a.click();
   setTimeout(function(){ URL.revokeObjectURL(a.href); a.remove(); }, 500);
 }
@@ -1041,17 +1041,32 @@ function seedDemo(){
   var marlowe = mk("agent","Marlowe","The loud one. Sounds like my old manager.",0.42,0.20);
   var quiet   = mk("agent","the quiet one","Barely above a whisper. Somehow worse.",0.60,0.12);
   var bus     = mk("real","the bus braking outside","Every time it brakes I\u2019m sure it\u2019s signaling.",0.20,0.76);
+  var porch   = mk("real","the neighbor\u2019s porch light","Comes on when I get home. Marlowe says it\u2019s a signal. It\u2019s a porch light.",0.14,0.60);
+  var unread  = mk("real","the unread message","Blue ticks, no reply all day. The quiet one filled the silence.",0.28,0.86);
   var dread   = mk("feeling","3am dread","Wakes me before the alarm. The worst part.",0.50,0.55);
+  var flat    = mk("feeling","the flat afternoon","Not sad exactly. Like the color went out of things around 3pm.",0.44,0.70);
   var rule    = mk("rule","don\u2019t tell anyone","If I tell, they\u2019ll know I told.",0.78,0.70);
+  var rule2   = mk("rule","answer within the hour","Used to be \u2018answer by tonight.\u2019 Moved the deadline when I started meeting it.",0.70,0.52);
   var grade   = mk("claim","you\u2019ll fail the review","Said every night the week before my review.",0.58,0.28);
+  var ttable  = mk("claim","everyone at the table knew","Said it three times on the drive home. Nobody looked at me funny.",0.34,0.30);
+  var tired   = mk("claim","she\u2019s tired of you","Whispered it through the whole call. She invited me back next week.",0.68,0.26);
   var memory  = mk("memory","grandmother\u2019s kitchen","They use her voice. That\u2019s what makes it land.",0.30,0.34);
   var drain   = mk("drain","arguing back","The most tiring thing I do all day.",0.64,0.58);
+  var replay  = mk("drain","replaying the call","Two hours going over every word she said.",0.76,0.80);
   ln(marlowe, bus, "uses");
+  ln(marlowe, porch, "points at");
   ln(marlowe, grade, "");
+  ln(marlowe, ttable, "announces");
+  ln(ttable, drain, "feeds");
   ln(grade, dread, "feeds");
   ln(marlowe, rule, "enforces");
+  ln(marlowe, rule2, "revises");
   ln(marlowe, memory, "mines");
   ln(marlowe, drain, "feeds");
+  ln(quiet, tired, "whispers");
+  ln(quiet, flat, "brings");
+  ln(unread, tired, "becomes evidence");
+  ln(tired, replay, "feeds");
   ln(quiet, dread, "");
   return {demo:true, finished:true,
     additions:"Nobody else has mentioned the timing thing \u2014 mine always gets worse right before it rains.",
@@ -1062,7 +1077,9 @@ function seedStormDemo(){
   return {frags:[
     {id:"demo_sf1", text:"that thing again at the bus stop", ts:now-2*86400000},
     {id:"demo_sf2", text:"3am. couldn't tell if it was a dream.", ts:now-86400000},
-    {id:"demo_sf3", text:"Marlowe wouldn't stop during the meeting", ts:now-5*3600000}
+    {id:"demo_sf3", text:"Marlowe wouldn't stop during the meeting", ts:now-5*3600000},
+    {id:"demo_sf4", text:"porch light again. probably nothing.", ts:now-3*86400000},
+    {id:"demo_sf5", text:"she said \u2018talk soon\u2019 \u2014 the quiet one says that means never", ts:now-8*3600000}
   ]};
 }
 function loadDemo(){
