@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Triangulation — Build Your Map</title>
+<title>Ever Present — a personal atlas</title>
 <style>
   :root{
     --paper:#faf7f1; --card:#fffdf9; --ink:#2b2620; --muted:#7a7166;
@@ -207,8 +207,8 @@
 <body>
 <div class="wrap">
   <header class="site">
-    <h1>Triangulation</h1>
-    <p class="tagline">Build your map — piece by piece. No questions, just a puzzle.</p>
+    <h1>Ever Present</h1>
+    <p class="tagline">A personal atlas. Build your map — piece by piece. No questions, just a puzzle.</p>
     <p class="noprint" style="margin:0 0 6px"><button class="btn quiet small" id="stormBtn">Storm mode — just get it down</button></p>
   </header>
 
@@ -227,7 +227,7 @@
 <script>
 "use strict";
 /* ============================================================
-   Triangulation: Build Your Map — research instrument, v2
+   Ever Present — research instrument, v2
    Method: not a questionnaire. The person names the pieces of
    their experience, places them on the triangle, draws the lines
    between them — and the map reflects back what it sees.
@@ -996,7 +996,7 @@ function bindMap(){
 function downloadJSON(){
   var insights = computeInsights(piecesArr(), linksArr());
   var out = {
-    instrument: "Triangulation: Build Your Map",
+    instrument: "Ever Present",
     version: 2,
     demo: !!state.demo,
     exported_at: new Date().toISOString(),
